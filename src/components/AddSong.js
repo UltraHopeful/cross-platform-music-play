@@ -7,38 +7,146 @@ import {
   DialogTitle,
   InputAdornment,
   TextField,
-  makeStyles
+  makeStyles,
 } from "@material-ui/core";
 
+import { ADD_SONGS } from './../graphql/mutations';
 import React from "react";
+import ReactPlayer from "react-player";
+import SoundcloudPlayer from "react-player/lib/players/SoundCloud";
+import YoutubePlayer from "react-player/lib/players/YouTube";
+import { useMutation } from "@apollo/client";
 
-const useStyles = makeStyles(theme => ({
+// import { Add } from "@material-ui/icons";
+
+
+const useStyles = makeStyles((theme) => ({
   container: {
     display: "flex",
-    alignItems: "center"
+    alignItems: "center",
+    marginTop: "75px",
   },
   urlInput: {
-    margin: theme.spacing(1)
+    margin: theme.spacing(1),
   },
   addSongButton: {
-    margin: theme.spacing(1)
+    margin: theme.spacing(1),
   },
   dialog: {
-    textAlign: "center"
+    textAlign: "center",
   },
   thumbnail: {
-    width: "90%"
-  }
+    width: "90%",
+  },
 }));
+
+const DEFAULT_SONG = {duration: 0,
+  title: "",
+  artist: "",
+  thumbnail: "",}
 
 function AddSong() {
   const classes = useStyles();
+  const [addSong, {error}] = useMutation(ADD_SONGS);
+  const [url, SetUrl] = React.useState("");
   const [dialog, setDialog] = React.useState(false);
+  const [playable, setPlayable] = React.useState(false);
+  const [song, setSong] = React.useState({
+    duration: 0,
+    title: "",
+    artist: "",
+    thumbnail: "",
+  });
+
+  React.useEffect(() => {
+    const isPlayable =
+      SoundcloudPlayer.canPlay(url) || YoutubePlayer.canPlay(url);
+    setPlayable(isPlayable);
+  }, [url]);
+
+  async function handleEditSong({ player }) {
+    const nestedPlayer = player.player.player;
+    let songData;
+    console.log(nestedPlayer);
+    if (nestedPlayer.getVideoData) {
+      songData = getYoutubeInfo(nestedPlayer);
+      console.log(songData);
+    } else if (nestedPlayer.getCurrentSound) {
+      songData = await getSoundcloudInfo(nestedPlayer);
+    }
+    setSong({ ...songData, url });
+  }
+
+  async function handleAddSong(){
+    try{
+      const {url,thumbnail,duration,artist,title} = song
+      await addSong(
+        {variables:
+        {
+          url: url.length > 0 ? url : null,
+          thumbnail: thumbnail.length > 0 ? thumbnail: null,
+          duration: duration > 0 ? duration: 0,
+          title: title.length > 0 ? title:null,
+          artist: artist.length> 0 ? artist:null,
+        }
+        }
+      )
+      handleCloseDialog()
+      setSong(DEFAULT_SONG)
+      SetUrl('')
+    }
+    
+    catch (error){
+      console.error("Error adding song",error)
+    }
+  }
+
+  function getYoutubeInfo(player) {
+    const duration = Number(player.getDuration);
+    console.log(player.getVideoData());
+    const { title, video_id, author } = player.getVideoData();
+    const thumbnail = `http://img.youtube.com/vi/${video_id}/0.jpg`;
+    return {
+      duration: duration > 0 ? duration : 0,
+      title,
+      artist: author,
+      thumbnail,
+    };
+  }
+
+  function getSoundcloudInfo(player) {
+    return new Promise((resolve) => {
+      player.getCurrentSound((songData) => {
+        console.log(songData);
+        if (songData) {
+          resolve({
+            duration: Number(songData.duration / 1000),
+            title: songData.title,
+            artist: songData.user.username,
+            thumbnail: songData.artwork_url.replace("-large", "-t500x500"),
+          });
+        }
+      });
+    });
+  }
+
+  function handleChangeSong(event) {
+    const { name, value } = event.target;
+    setSong((prevSong) => ({
+      ...prevSong,
+      [name]: value,
+    }));
+  }
 
   function handleCloseDialog() {
     setDialog(false);
   }
 
+  function handleError(field) {
+    return error?.graphQLErrors[0]?.extensions?.path.includes(field);
+  }
+  
+  const { thumbnail, title, artist } = song;
   return (
     <div className={classes.container}>
       <Dialog
@@ -49,24 +157,46 @@ function AddSong() {
         <DialogTitle>Edit Song</DialogTitle>
         <DialogContent>
           <img
-            src="http://img.youtube.com/vi/--ZtUFsIgMk/0.jpg"
+            src={thumbnail}
             alt="Song thumbnail"
             className={classes.thumbnail}
           />
-          <TextField margin="dense" name="title" label="Title" fullWidth />
-          <TextField margin="dense" name="artist" label="Artist" fullWidth />
           <TextField
+            value={title}
+            onChange={handleChangeSong}
+            margin="dense"
+            name="title"
+            label="Title"
+            fullWidth
+            error={handleError('title')}
+            helperText={handleError('title') && 'Fill out the field'}
+          />
+          <TextField
+            value={artist}
+            onChange={handleChangeSong}
+            margin="dense"
+            name="artist"
+            label="Artist"
+            fullWidth
+            error={handleError('artist')}
+            helperText={handleError('artist') && 'Fill out the field'}
+          />
+          <TextField
+            value={thumbnail}
+            onChange={handleChangeSong}
             margin="dense"
             name="thumbnail"
             label="Thumbnail"
             fullWidth
+            error={handleError('thumbnail')}
+            helperText={handleError('thumbnail') && 'Fill out the field'}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog} color="secondary">
             Cancel
           </Button>
-          <Button variant="outlined" color="primary">
+          <Button onClick={handleAddSong} variant="outlined" color="primary">
             Add Song
           </Button>
         </DialogActions>
@@ -74,6 +204,8 @@ function AddSong() {
       <TextField
         className={classes.urlInput}
         placeholder="Add Youtube or Soundcloud Url"
+        onChange={(event) => SetUrl(event.target.value)}
+        value={url}
         fullWidth
         margin="normal"
         type="url"
@@ -82,10 +214,11 @@ function AddSong() {
             <InputAdornment position="start">
               <Link />
             </InputAdornment>
-          )
+          ),
         }}
       />
       <Button
+        disabled={!playable}
         className={classes.addSongButton}
         onClick={() => setDialog(true)}
         variant="contained"
@@ -94,6 +227,7 @@ function AddSong() {
       >
         Add
       </Button>
+      <ReactPlayer url={url} hidden onReady={handleEditSong} />
     </div>
   );
 }
