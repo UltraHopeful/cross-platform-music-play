@@ -7,16 +7,16 @@ import {
   Typography,
   makeStyles
 } from "@material-ui/core";
-import { PlayArrow, SkipNext, SkipPrevious } from "@material-ui/icons";
+import { Pause, PlayArrow, SkipNext, SkipPrevious } from "@material-ui/icons";
 
 import QueuedSongList from "./QueuedSongList";
 import React from "react";
+import { SongContext } from "../App";
 
 const useStyles = makeStyles(theme => ({
   container: {
     display: "flex",
     justifyContent: "space-between",
-    marginTop: "78px",
   },
   details: {
     display: "flex",
@@ -42,7 +42,12 @@ const useStyles = makeStyles(theme => ({
 }));
 
 function SongPlayer() {
+  const {state,dispatch} = React.useContext(SongContext);
   const classes = useStyles();
+
+  function handleTogglePlay(){
+    dispatch(state.isPlaying ? {type:"PAUSE_SONG"} : {type:"PLAY_SONG"});
+  }
 
   return (
     <>
@@ -50,18 +55,18 @@ function SongPlayer() {
         <div className={classes.details}>
           <CardContent className={classes.content}>
             <Typography variant="h5" component="h3">
-              Title
+              {state.song.title}
             </Typography>
             <Typography variant="subtitle1" component="p" color="textSecondary">
-              Artist
+              {state.song.artist}
             </Typography>
           </CardContent>
           <div className={classes.controls}>
             <IconButton>
               <SkipPrevious />
             </IconButton>
-            <IconButton>
-              <PlayArrow className={classes.playIcon} />
+            <IconButton onClick={handleTogglePlay}>
+              {state.isPlaying ? <Pause className={classes.playIcon} /> : <PlayArrow className={classes.playIcon} />}
             </IconButton>
             <IconButton>
               <SkipNext />
@@ -74,7 +79,7 @@ function SongPlayer() {
         </div>
         <CardMedia
           className={classes.thumbnail}
-          image="http://img.youtube.com/vi/KbC46oJmLh4/0.jpg"
+          image={state.song.thumbnail}
         />
       </Card>
       <QueuedSongList />

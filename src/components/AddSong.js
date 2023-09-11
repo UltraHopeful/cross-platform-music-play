@@ -24,7 +24,6 @@ const useStyles = makeStyles((theme) => ({
   container: {
     display: "flex",
     alignItems: "center",
-    marginTop: "75px",
   },
   urlInput: {
     margin: theme.spacing(1),
