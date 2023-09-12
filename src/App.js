@@ -30,7 +30,7 @@ return (
     <Hidden only="xs">
       <Header />
     </Hidden>
-    <Grid container spacing={3}>
+    <Grid container sx={{p:3}} >
       <Grid
         style={{
           paddingTop: greaterThanSm ? 80 : 10
@@ -59,6 +59,7 @@ return (
               }
         }
         item
+        p={7}
         xs={12}
         md={5}
       >
